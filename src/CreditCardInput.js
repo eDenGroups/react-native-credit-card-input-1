@@ -22,6 +22,14 @@ const s = StyleSheet.create({
   form: {
     marginTop: 20
   },
+  verticalForm: {
+    marginTop: 20,
+  },
+  verticalFormRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   inputContainer: {
     marginLeft: 20
   },
@@ -50,6 +58,8 @@ const POSTAL_CODE_INPUT_WIDTH = 120 // https://github.com/yannickcr/eslint-plugi
     labels: PropTypes.object,
     placeholders: PropTypes.object,
 
+    formStyle: ViewPropTypes.style,
+    verticalFormRowStyle: ViewPropTypes.style,
     labelStyle: Text.propTypes.style,
     inputStyle: Text.propTypes.style,
     inputContainerStyle: ViewPropTypes.style,
@@ -66,10 +76,11 @@ const POSTAL_CODE_INPUT_WIDTH = 120 // https://github.com/yannickcr/eslint-plugi
 
     allowScroll: PropTypes.bool,
 
-    additionalInputsProps: PropTypes.objectOf(
-      PropTypes.shape(TextInput.propTypes)
-    )
-  }
+    additionalInputsProps: PropTypes.objectOf(PropTypes.shape(TextInput.propTypes)),
+
+    verticalForm: PropTypes.bool,
+    verticalFormRows: PropTypes.array,
+  };
 
   static defaultProps = {
     cardViewSize: {},
@@ -105,25 +116,22 @@ const POSTAL_CODE_INPUT_WIDTH = 120 // https://github.com/yannickcr/eslint-plugi
     if (this.props.focused !== newProps.focused) this._focus(newProps.focused)
   }
 
-  _focus = (field) => {
-    if (!field) return
+  _focus = field => {
+    const { verticalForm } = this.props;
+
+    if (!field) return;
 
     const scrollResponder = this.refs.Form.getScrollResponder()
     const nodeHandle = ReactNative.findNodeHandle(this.refs[field])
 
-    NativeModules.UIManager.measureLayoutRelativeToParent(
-      nodeHandle,
-      (e) => {
-        throw e
-      },
-      (x) => {
-        scrollResponder.scrollTo({
-          x: Math.max(x - PREVIOUS_FIELD_OFFSET, 0),
-          animated: true
-        })
-        this.refs[field].focus()
-      }
-    )
+    if (!verticalForm) {
+      NativeModules.UIManager.measureLayoutRelativeToParent(nodeHandle,
+        e => { throw e; },
+        x => {
+          scrollResponder.scrollTo({ x: Math.max(x - PREVIOUS_FIELD_OFFSET, 0), animated: true });
+          this.refs[field].focus();
+        });
+    }
   }
 
   _inputProps = (field) => {
@@ -167,6 +175,101 @@ const POSTAL_CODE_INPUT_WIDTH = 120 // https://github.com/yannickcr/eslint-plugi
     }
   }
 
+  renderField = (fieldName, fieldWidth) => {
+    const { inputContainerStyle } = this.props;
+
+    switch (fieldName) {
+      case "number":
+        return (
+          <CCInput {...this._inputProps(fieldName)}
+            key={fieldName}
+            keyboardType="numeric"
+            containerStyle={[
+              s.inputContainer, inputContainerStyle,
+              { width: fieldWidth || CARD_NUMBER_INPUT_WIDTH }]} />
+        );
+      case "expiry":
+        return (
+          <CCInput {...this._inputProps(fieldName)}
+            key={fieldName}
+            keyboardType="numeric"
+            containerStyle={[
+              s.inputContainer,
+              inputContainerStyle, { width: fieldWidth || EXPIRY_INPUT_WIDTH }]} />
+        );
+      case "cvc":
+        return (
+          <CCInput {...this._inputProps(fieldName)}
+            key={fieldName}
+            keyboardType="numeric"
+            containerStyle={[s.inputContainer, inputContainerStyle, { width: fieldWidth || CVC_INPUT_WIDTH }]} />
+        );
+      case "name":
+        return (
+          <CCInput {...this._inputProps(fieldName)}
+            key={fieldName}
+            containerStyle={[s.inputContainer, inputContainerStyle, { width: fieldWidth || NAME_INPUT_WIDTH }]} />
+        );
+      case "postalCode":
+        return (
+          <CCInput {...this._inputProps("postalCode")}
+            key={fieldName}
+            keyboardType="numeric"
+            containerStyle={[s.inputContainer, inputContainerStyle, { width: fieldWidth || POSTAL_CODE_INPUT_WIDTH }]} />
+        );
+      default:
+        return null;
+    }
+  }
+
+  renderVerticalForm = () => {
+    const { formStyle, verticalFormRowStyle, verticalFormRows } = this.props;
+
+    return (
+      <ScrollView
+        ref="Form"
+        horizontal={false}
+        keyboardShouldPersistTaps="always"
+        showsVerticalScrollIndicator={false}
+        style={[s.verticalForm, formStyle]}>
+        { verticalFormRows.map((row, index) => (
+          <View style={[s.verticalFormRow, verticalFormRowStyle]} key={index}>
+            { row.fields.map((field) => (
+              this.renderField(field.name, field.width)
+            ))}
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }
+
+  renderHorizontalForm = () => {
+    const { formStyle, allowScroll, requiresName, requiresCVC, requiresPostalCode } = this.props;
+
+    return (
+      <ScrollView
+        ref="Form"
+        horizontal
+        keyboardShouldPersistTaps="always"
+        scrollEnabled={allowScroll}
+        showsHorizontalScrollIndicator={false}
+        style={[s.form, formStyle]}>
+        { this.renderField("number") }
+        { this.renderField("expiry") }
+        { requiresCVC && this.renderField("cvc") }
+        { requiresName && this.renderField("name") }
+        { requiresPostalCode && this.renderField("postalCode") }
+      </ScrollView>
+    );
+  }
+
+  renderForm = () => (
+    this.props.verticalForm ?
+      this.renderVerticalForm()
+      :
+      this.renderHorizontalForm()
+  )
+
   render() {
     const {
       cardImageFront,
@@ -181,8 +284,8 @@ const POSTAL_CODE_INPUT_WIDTH = 120 // https://github.com/yannickcr/eslint-plugi
       cardScale,
       cardFontFamily,
       cardBrandIcons,
-      placeholders
-    } = this.props
+      placeholders,
+    } = this.props;
 
     return (
       <View style={s.container}>
@@ -208,66 +311,9 @@ const POSTAL_CODE_INPUT_WIDTH = 120 // https://github.com/yannickcr/eslint-plugi
           }
           number={number}
           expiry={expiry}
-          cvc={cvc}
-        />
-        <ScrollView
-          ref="Form"
-          horizontal
-          keyboardShouldPersistTaps="always"
-          scrollEnabled={allowScroll}
-          showsHorizontalScrollIndicator={false}
-          style={s.form}>
-          <CCInput
-            {...this._inputProps('number')}
-            keyboardType="numeric"
-            containerStyle={[
-              s.inputContainer,
-              inputContainerStyle,
-              { width: CARD_NUMBER_INPUT_WIDTH }
-            ]}
-          />
-          <CCInput
-            {...this._inputProps('expiry')}
-            keyboardType="numeric"
-            containerStyle={[
-              s.inputContainer,
-              inputContainerStyle,
-              { width: EXPIRY_INPUT_WIDTH }
-            ]}
-          />
-          {requiresCVC && (
-            <CCInput
-              {...this._inputProps('cvc')}
-              keyboardType="numeric"
-              containerStyle={[
-                s.inputContainer,
-                inputContainerStyle,
-                { width: CVC_INPUT_WIDTH }
-              ]}
-            />
-          )}
-          {requiresName && (
-            <CCInput
-              {...this._inputProps('name')}
-              containerStyle={[
-                s.inputContainer,
-                inputContainerStyle,
-                { width: NAME_INPUT_WIDTH }
-              ]}
-            />
-          )}
-          {requiresPostalCode && (
-            <CCInput
-              {...this._inputProps('postalCode')}
-              keyboardType="numeric"
-              containerStyle={[
-                s.inputContainer,
-                inputContainerStyle,
-                { width: POSTAL_CODE_INPUT_WIDTH }
-              ]}
-            />
-          )}
-        </ScrollView>
+          cvc={cvc} />
+
+          { this.renderForm() }
       </View>
     )
   }
