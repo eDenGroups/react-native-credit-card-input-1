@@ -4,6 +4,7 @@ import ReactNative, {
   NativeModules,
   View,
   Text,
+  Keyboard,
   StyleSheet,
   ScrollView,
   Dimensions,
@@ -229,7 +230,7 @@ const POSTAL_CODE_INPUT_WIDTH = 120 // https://github.com/yannickcr/eslint-plugi
       <ScrollView
         ref="Form"
         horizontal={false}
-        keyboardShouldPersistTaps="always"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         style={[s.verticalForm, formStyle]}>
         { verticalFormRows.map((row, index) => (
@@ -250,7 +251,7 @@ const POSTAL_CODE_INPUT_WIDTH = 120 // https://github.com/yannickcr/eslint-plugi
       <ScrollView
         ref="Form"
         horizontal
-        keyboardShouldPersistTaps="never"
+        keyboardShouldPersistTaps="always"
         scrollEnabled={allowScroll}
         showsHorizontalScrollIndicator={false}
         style={[s.form, formStyle]}>
